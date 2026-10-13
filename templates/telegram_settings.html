@@ -1,0 +1,86 @@
+{% extends "admin/base.html" %}
+
+{% block content %}
+<div class="jumbotron">
+	<div class="container">
+		<h1>Telegram Notify</h1>
+	</div>
+</div>
+<div class="container">
+	<div class="row">
+		<div class="col-md-8">
+			{% if request.args.get('saved') %}
+			<div class="alert alert-success">Settings saved.</div>
+			{% endif %}
+			{% if request.args.get('test_ok') == '1' %}
+			<div class="alert alert-success">Test message sent successfully.</div>
+			{% elif request.args.get('test_ok') == '0' %}
+			<div class="alert alert-danger">Test message failed to send. Check the bot token / chat id and server logs.</div>
+			{% endif %}
+			{% if request.args.get('reset') %}
+			<div class="alert alert-success">Half-time / freeze notification flags were reset. They'll fire again next time their condition is met.</div>
+			{% endif %}
+
+			<form method="POST" action="{{ url_for('telegram_notify.save_settings') }}">
+				<input type="hidden" name="nonce" value="{{ nonce }}">
+
+				<div class="form-group">
+					<label>Bot Token</label>
+					<input type="text" class="form-control" name="telegram_bot_token"
+						value="{{ settings.telegram_bot_token or '' }}" placeholder="123456:ABC-DEF...">
+				</div>
+
+				<div class="form-group">
+					<label>Chat ID</label>
+					<input type="text" class="form-control" name="telegram_chat_id"
+						value="{{ settings.telegram_chat_id or '' }}" placeholder="-1001234567890">
+				</div>
+
+				<div class="form-group">
+					<label>Topic / Thread ID <small class="text-muted">(optional, for forum-style groups)</small></label>
+					<input type="text" class="form-control" name="telegram_thread_id"
+						value="{{ settings.telegram_thread_id or '' }}" placeholder="leave blank if not using topics">
+				</div>
+
+				<div class="form-group">
+					<label>API Base URL <small class="text-muted">(advanced, leave default unless self-hosting the Bot API)</small></label>
+					<input type="text" class="form-control" name="telegram_api_base"
+						value="{{ settings.telegram_api_base or '' }}" placeholder="https://api.telegram.org">
+				</div>
+
+				<div class="form-group">
+					<div class="form-check">
+						<input class="form-check-input" type="checkbox" name="telegram_notify_solves" id="notify_solves"
+							{% if toggles.telegram_notify_solves %}checked{% endif %}>
+						<label class="form-check-label" for="notify_solves">Notify on challenge solves</label>
+					</div>
+					<div class="form-check">
+						<input class="form-check-input" type="checkbox" name="telegram_notify_halftime" id="notify_halftime"
+							{% if toggles.telegram_notify_halftime %}checked{% endif %}>
+						<label class="form-check-label" for="notify_halftime">Notify at half-time (needs Start and End set under Admin &rarr; Config &rarr; Time)</label>
+					</div>
+					<div class="form-check">
+						<input class="form-check-input" type="checkbox" name="telegram_notify_freeze" id="notify_freeze"
+							{% if toggles.telegram_notify_freeze %}checked{% endif %}>
+						<label class="form-check-label" for="notify_freeze">Notify when the scoreboard freeze time is reached</label>
+					</div>
+				</div>
+
+				<button type="submit" class="btn btn-primary">Save</button>
+			</form>
+
+			<hr>
+
+			<form method="POST" action="{{ url_for('telegram_notify.send_test') }}" class="d-inline">
+				<input type="hidden" name="nonce" value="{{ nonce }}">
+				<button type="submit" class="btn btn-secondary">Send Test Message</button>
+			</form>
+
+			<form method="POST" action="{{ url_for('telegram_notify.reset_flags') }}" class="d-inline">
+				<input type="hidden" name="nonce" value="{{ nonce }}">
+				<button type="submit" class="btn btn-outline-warning">Reset Half-time / Freeze Flags</button>
+			</form>
+		</div>
+	</div>
+</div>
+{% endblock %}
