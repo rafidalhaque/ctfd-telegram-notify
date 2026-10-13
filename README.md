@@ -92,3 +92,18 @@ built-in public account-settings template of the same name — Flask's
 template loader silently preferred CTFd's version, so the admin page
 rendered the wrong content entirely. Fixed by renaming to
 `telegram_settings.html`.
+
+A third bug was caught after reports of the half-time notification
+never firing in practice: `telegram_halftime_sent` (and
+`telegram_freeze_sent`) were marked "done" unconditionally, even when
+`_send_telegram_message()` failed (bad token, bot not in the group,
+a transient network error, wrong API base, etc.) right at the moment
+the midpoint was crossed. Since the check is one-shot, a single failed
+attempt permanently "used up" the notification with it never actually
+being delivered, and the only way out was a manual Reset Flags click.
+Fixed so the "sent" flag is only set when the send actually succeeds;
+otherwise it logs a warning and retries on the next request. Verified
+by pointing the API base at a bad hostname (forcing a real network
+failure), confirming the flag stayed unset and the mock server received
+nothing, then fixing the URL and confirming the very next request
+retried and delivered successfully.

@@ -173,10 +173,15 @@ def _check_time_based_notifications():
             midpoint = start + (end - start) / 2
             if now >= midpoint:
                 remaining = _format_hms(end - now)
-                _send_telegram_message(
+                sent = _send_telegram_message(
                     f"⏰ <b>Halfway there!</b> Roughly {remaining} left until the CTF ends."
                 )
-                set_config("telegram_halftime_sent", "1")
+                if sent:
+                    set_config("telegram_halftime_sent", "1")
+                else:
+                    log.warning(
+                        "Halftime notification failed to send; will retry on next request"
+                    )
 
     freeze = get_config("freeze")
     if (
@@ -185,11 +190,16 @@ def _check_time_based_notifications():
         and not _is_enabled(get_config("telegram_freeze_sent"))
     ):
         if now >= int(freeze):
-            _send_telegram_message(
+            sent = _send_telegram_message(
                 "\U0001F9CA <b>Scoreboard frozen.</b> Submissions still count, "
                 "but rankings won't update publicly until the event ends."
             )
-            set_config("telegram_freeze_sent", "1")
+            if sent:
+                set_config("telegram_freeze_sent", "1")
+            else:
+                log.warning(
+                    "Freeze notification failed to send; will retry on next request"
+                )
 
 
 telegram_bp = Blueprint("telegram_notify", __name__, template_folder="templates")
