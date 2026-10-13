@@ -55,6 +55,11 @@
 						<label class="form-check-label" for="notify_solves">Notify on challenge solves</label>
 					</div>
 					<div class="form-check">
+						<input class="form-check-input" type="checkbox" name="telegram_notify_firstblood" id="notify_firstblood"
+							{% if toggles.telegram_notify_firstblood %}checked{% endif %}>
+						<label class="form-check-label" for="notify_firstblood">Notify on first blood (first solve of each challenge, called out separately)</label>
+					</div>
+					<div class="form-check">
 						<input class="form-check-input" type="checkbox" name="telegram_notify_halftime" id="notify_halftime"
 							{% if toggles.telegram_notify_halftime %}checked{% endif %}>
 						<label class="form-check-label" for="notify_halftime">Notify at half-time (needs Start and End set under Admin &rarr; Config &rarr; Time)</label>

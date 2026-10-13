@@ -2,6 +2,8 @@
 
 Sends Telegram messages for:
 - Every challenge solve: `🚩 <b>ChallengeName</b> solved by <b>solver</b>!`
+- First blood on each challenge (the first solve), called out separately:
+  `🩸 <b>First blood!</b> <b>solver</b> was first to solve <b>ChallengeName</b>!`
 - Halfway through the competition (midpoint of CTFd's Start/End config)
 - When the scoreboard freeze time is reached (CTFd's Freeze config)
 
@@ -10,7 +12,9 @@ Admin page at `/admin/telegram-notify`:
 - **Bot Token** / **Chat ID** / **Topic (Thread) ID** (optional, for
   forum-style Telegram groups) / **API Base URL** (advanced; leave
   default unless self-hosting the Bot API server).
-- Per-event toggles for solves / half-time / freeze.
+- Per-event toggles for solves / first blood / half-time / freeze
+  (independent of each other — e.g. first blood can be on while regular
+  solve notifications are off, or both together).
 - **Send Test Message** button to confirm your bot token/chat id work
   before the event starts.
 - **Reset Half-time / Freeze Flags** button, in case you change the
@@ -21,12 +25,15 @@ All settings are stored via CTFd's own `get_config`/`set_config`
 key-value store — no extra settings table.
 
 ## How it works
-- **Solves**: hooks a SQLAlchemy `after_insert` event on the `Solves`
-  model (fires regardless of code path — flag submission, admin-awarded
-  solve, etc.), buffers the new solve's id in the request's `g`, then
-  sends the actual Telegram message from an `after_request` hook once
-  CTFd's own commit has completed. This keeps the notification off the
-  critical path of the flag-submission transaction.
+- **Solves / first blood**: hooks a SQLAlchemy `after_insert` event on
+  the `Solves` model (fires regardless of code path — flag submission,
+  admin-awarded solve, etc.), buffers the new solve's id in the
+  request's `g`, then sends the actual Telegram message(s) from an
+  `after_request` hook once CTFd's own commit has completed. This keeps
+  the notification off the critical path of the flag-submission
+  transaction. First blood is determined by counting committed `Solves`
+  rows for that challenge at that point — if it's the only one, this was
+  the first solve.
 - **Half-time / freeze**: checked on every request via
   `app.before_request` (same approach as the companion
   `ctfd-challenge-scheduler` plugin) — no background thread needed,
@@ -53,6 +60,13 @@ setting, logging every request it received:
   insert) as a non-admin user — correct message with the right
   challenge name and solver name. A follow-up wrong-flag submission (and
   a duplicate correct one) correctly produced zero additional messages.
+- **First blood**: two users solving the same challenge in sequence —
+  the first solver triggered both a first-blood message and the regular
+  solve message (in that order), the second solver triggered only the
+  regular message. Re-tested with regular solve notifications disabled
+  and first blood alone enabled on a second challenge: exactly one
+  message sent (first blood only), confirming the two toggles are
+  independent.
 - **Half-time / freeze**: set Start/End/Freeze so both were already due;
   both fired exactly once on the next page load, and did **not** re-fire
   on subsequent requests. "Reset Flags" correctly re-armed both, and they

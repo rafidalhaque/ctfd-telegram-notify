@@ -3,6 +3,7 @@ CTFd Telegram Notify
 ----------------------
 Sends Telegram messages for:
   * Every challenge solve ("<name> solved by <user>!")
+  * First blood on each challenge (the first solve, called out separately)
   * Halfway through the competition (CTFd's start/end config)
   * When the scoreboard freeze time is reached (CTFd's freeze config)
 
@@ -33,6 +34,7 @@ CONFIG_KEYS = [
     "telegram_thread_id",
     "telegram_api_base",
     "telegram_notify_solves",
+    "telegram_notify_firstblood",
     "telegram_notify_halftime",
     "telegram_notify_freeze",
 ]
@@ -102,7 +104,9 @@ def _send_telegram_message(text):
 
 
 def _notify_solve(solve_id):
-    if not _is_enabled(get_config("telegram_notify_solves")):
+    notify_solves = _is_enabled(get_config("telegram_notify_solves"))
+    notify_firstblood = _is_enabled(get_config("telegram_notify_firstblood"))
+    if not notify_solves and not notify_firstblood:
         return
 
     solve = Solves.query.get(solve_id)
@@ -114,8 +118,24 @@ def _notify_solve(solve_id):
         return
 
     name = solve.account.name if solve.account else "someone"
-    text = f"\U0001F6A9 <b>{challenge.name}</b> solved by <b>{name}</b>!"
-    _send_telegram_message(text)
+
+    # First blood: this is the only solve recorded for this challenge so
+    # far. Checked here (post-commit, in after_request) rather than in
+    # the after_insert hook, since the count needs the committed row and
+    # a stable read, not a mid-flush one.
+    is_first_blood = (
+        Solves.query.filter_by(challenge_id=challenge.id).count() == 1
+    )
+
+    if is_first_blood and notify_firstblood:
+        _send_telegram_message(
+            f"\U0001FA78 <b>First blood!</b> <b>{name}</b> was first to solve "
+            f"<b>{challenge.name}</b>!"
+        )
+
+    if notify_solves:
+        text = f"\U0001F6A9 <b>{challenge.name}</b> solved by <b>{name}</b>!"
+        _send_telegram_message(text)
 
 
 def _queue_solve_notification(mapper, connection, target):
@@ -181,7 +201,12 @@ def view_settings():
     settings = _settings()
     toggles = {
         k: _is_enabled(settings[k])
-        for k in ("telegram_notify_solves", "telegram_notify_halftime", "telegram_notify_freeze")
+        for k in (
+            "telegram_notify_solves",
+            "telegram_notify_firstblood",
+            "telegram_notify_halftime",
+            "telegram_notify_freeze",
+        )
     }
     return render_template(
         "telegram_settings.html",
